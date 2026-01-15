@@ -3,19 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from IPython.display import display, Markdown
+import parse_data as ps
 
 def display_title(s, pref='Figure', num=1, center=False):
     ctag = 'center' if center else 'p'
     s = f'<{ctag}><span style="font-size: 1.2em;"><b>{pref} {num}</b>: {s}</span></{ctag}>'
     display(Markdown(s))
-
-def corrcoeff(x, y):
-    return np.corrcoef(x, y)[0, 1]
-
-def plot_regression_line(ax, x, y, **kwargs):
-    if len(x) > 1:
-        a, b = np.polyfit(x, y, 1)
-        ax.plot(x, a*x + b, **kwargs)
 
 def central(x):
     if len(x) == 0: return None, None, None
@@ -25,55 +18,40 @@ def dispersion(x):
     if len(x) == 0: return None, None, None, None, None, None, None
     return x.std(), x.min(), x.max(), x.max()-x.min(), x.quantile(0.25), x.quantile(0.75), x.quantile(0.75)-x.quantile(0.25)
 
-def display_central_tendency_table(df, num=1):
-    display_title('Central tendency summary statistics.', pref='Table', num=num)
-    target_df = df[['age', 'depression', 'academic_pressure', 'financial_concerns']]
-    df_out = target_df.apply(central).apply(pd.Series)
-    df_out.index = ['Mean', 'Median', 'Mode']
-    display(df_out.round(2))
+def check_data_quality(df):
+    display_title('Data Quality and Missing Values Check', pref='Table', num=0)
+    quality_df = pd.DataFrame({
+        'Missing Values': df.isnull().sum(),
+        'Data Type': df.dtypes
+    })
+    display(quality_df)
 
-def display_dispersion_table(df, num=2):
-    display_title('Dispersion summary statistics.', pref='Table', num=num)
-    target_df = df[['age', 'depression', 'academic_pressure', 'financial_concerns']]
-    df_out = target_df.apply(dispersion).apply(pd.Series)
-    df_out.index = ['St.Dev', 'Min', 'Max', 'Range', '25%', '75%', 'IQR']
-    display(df_out.round(2))
-
-def plot_descriptive(df):
-    y = df['depression']
-    age = df['age']
-    press = df['academic_pressure']
-    money = df['financial_concerns']
-
-    fig, axs = plt.subplots(2, 2, figsize=(10, 8), tight_layout=True)
+def display_summary_tables(df):
+    cols = ['age', 'depression', 'academic_pressure', 'average_sleep', 'anxiety', 'isolation']
     
-    ivs = [age, press, money]
-    colors = ['b', 'r', 'g']
-    labels = ['Age', 'Academic Pressure', 'Financial Concerns']
+    display_title('Central Tendency Summary Statistics', pref='Table', num=1)
+    df_central = df[cols].apply(central).apply(pd.Series)
+    df_central.index = ['Mean', 'Median', 'Mode']
+    display(df_central.round(2))
     
-    for ax, x, c, lbl in zip(axs.ravel()[:3], ivs, colors, labels):
-        ax.scatter(x, y, alpha=0.5, color=c)
-        plot_regression_line(ax, x, y, color='k', ls='-', lw=2)
-        
-        r_val = corrcoeff(x, y)
-        ax.text(0.05, 0.9, f'r = {r_val:.3f}', color=c, transform=ax.transAxes, bbox=dict(color='0.9'))
-        ax.set_xlabel(lbl)
-        ax.set_ylabel('Depression')
+    display_title('Dispersion Summary Statistics', pref='Table', num=2)
+    df_disp = df[cols].apply(dispersion).apply(pd.Series)
+    df_disp.index = ['St.Dev', 'Min', 'Max', 'Range', '25%', '75%', 'IQR']
+    display(df_disp.round(2))
 
-    ax = axs[1, 1]
-    i_low = y <= 3
-    i_high = y > 3
-    
-    for i, c, lbl in zip([i_low, i_high], ['m', 'c'], ['Low Dep.', 'High Dep.']):
-        if len(money[i]) > 0:
-            ax.scatter(money[i], y[i], alpha=0.5, color=c, label=lbl)
-            plot_regression_line(ax, money[i], y[i], color=c, ls='-', lw=2)
-
-    ax.legend(fontsize='small')
-    ax.set_xlabel('Financial Concerns')
-    
-    for ax, s in zip(axs.ravel(), ['a', 'b', 'c', 'd']):
-        ax.text(0.02, 0.95, f'({s})', transform=ax.transAxes, fontweight='bold')
-
+def plot_distributions(df):
+    cols = ['depression', 'academic_pressure', 'average_sleep', 'anxiety']
+    fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    for ax, col in zip(axs.ravel(), cols):
+        sns.histplot(df[col], kde=True, ax=ax, color='skyblue')
+        ax.set_title(f'Distribution of {col.replace("_", " ").title()}')
+    plt.tight_layout()
+    display_title('Distribution Analysis of Key Variables', pref='Figure', num=1)
     plt.show()
-    display_title('Correlations amongst main variables.', pref='Figure', num=1)
+
+if __name__ == "__main__":
+    df = ps.get_data()
+    if df is not None:
+        check_data_quality(df)
+        display_summary_tables(df)
+        plot_distributions(df)
